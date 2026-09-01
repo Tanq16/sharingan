@@ -14,20 +14,24 @@ import (
 const showWorkers = 8
 
 var showFlags struct {
-	all bool
+	all      bool
+	profiles bool
 }
 
 var showCmd = &cobra.Command{
 	Use:   "show",
 	Short: "List the machines AWS reports for the active profile",
-	Long:  "List the machines AWS reports right now for the active profile, or with --all for every registered profile.",
+	Long:  "List the machines AWS reports right now for the active profile, with --all for every registered profile or --profiles for the registry itself.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if showFlags.all {
+		switch {
+		case showFlags.profiles:
+			showRegistry(cmd.Context())
+		case showFlags.all:
 			showEveryProfile(cmd.Context())
-			return
+		default:
+			showActiveProfile(cmd.Context())
 		}
-		showActiveProfile(cmd.Context())
 	},
 }
 
@@ -82,6 +86,34 @@ func showEveryProfile(ctx context.Context) {
 	}
 }
 
+func showRegistry(ctx context.Context) {
+	cfg, names := registeredProfiles()
+	accounts := make([]string, len(names))
+	errs := make([]error, len(names))
+
+	u.PrintRunning(fmt.Sprintf("Querying %d profiles", len(names)))
+	inParallel(len(names), func(i int) {
+		clients, err := awsx.New(ctx, names[i], cfg.Region(names[i]))
+		if err != nil {
+			errs[i] = err
+			return
+		}
+		accounts[i] = clients.Account
+	})
+	u.ClearLines(1)
+
+	rows := make([][]string, 0, len(names))
+	for i, name := range names {
+		account := accounts[i]
+		if errs[i] != nil {
+			u.PrintWarn(fmt.Sprintf("Failed to reach profile %s in %s", name, cfg.Region(name)), errs[i])
+			account = "-"
+		}
+		rows = append(rows, []string{name, account, cfg.Region(name)})
+	}
+	u.PrintTable([]string{"PROFILE", "ACCOUNT", "REGION"}, rows)
+}
+
 type profileInventory struct {
 	profile  string
 	region   string
@@ -129,4 +161,6 @@ func inParallel(n int, fn func(int)) {
 
 func init() {
 	showCmd.Flags().BoolVar(&showFlags.all, "all", false, "Query every registered profile instead of the active one")
+	showCmd.Flags().BoolVar(&showFlags.profiles, "profiles", false, "List the registered profiles with their AWS accounts and regions")
+	showCmd.MarkFlagsMutuallyExclusive("all", "profiles")
 }
