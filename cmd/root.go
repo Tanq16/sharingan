@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -13,10 +12,7 @@ import (
 
 var AppVersion = "dev-build"
 
-var (
-	debugFlag bool
-	forAIFlag bool
-)
+var debugFlag bool
 
 var rootCmd = &cobra.Command{
 	Use:               "sharingan",
@@ -27,23 +23,18 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func setupLogs() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.DateTime, NoColor: false}
+	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.DateTime, NoColor: !utils.StdoutIsTerminal}
 	log.Logger = zerolog.New(output).With().Timestamp().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if debugFlag {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		utils.GlobalDebugFlag = true
-	}
-	if forAIFlag {
-		utils.GlobalForAIFlag = true
-		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
 }
 
@@ -51,8 +42,6 @@ func init() {
 	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
 
 	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "Enable debug logging")
-	rootCmd.PersistentFlags().BoolVar(&forAIFlag, "for-ai", false, "AI-friendly output (plain text, piped input)")
-	rootCmd.MarkFlagsMutuallyExclusive("debug", "for-ai")
 
 	cobra.OnInitialize(setupLogs)
 
