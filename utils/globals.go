@@ -1,10 +1,17 @@
 package utils
 
-import "charm.land/lipgloss/v2"
+import (
+	"os"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
+)
+
+var GlobalDebugFlag bool
 
 var (
-	GlobalDebugFlag bool
-	GlobalForAIFlag bool
+	StdinIsTerminal  = term.IsTerminal(os.Stdin.Fd())
+	StdoutIsTerminal = term.IsTerminal(os.Stdout.Fd())
 )
 
 var (

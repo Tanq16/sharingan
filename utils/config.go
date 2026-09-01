@@ -1,7 +1,8 @@
 package utils
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -57,7 +58,7 @@ func (c *Config) Save() error {
 	if err := EnsureDir(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(c, "", "  ")
+	data, err := json.Marshal(c, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}

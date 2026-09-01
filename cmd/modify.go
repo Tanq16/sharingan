@@ -2,11 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/tanq16/sharingan/internal/machine"
 	u "github.com/tanq16/sharingan/utils"
 )
+
+var modifyFlags struct {
+	shape shapeFlag
+	class classFlag
+}
 
 var modifyCmd = &cobra.Command{
 	Use:   "modify <name>",
@@ -27,7 +33,7 @@ var modifyCmd = &cobra.Command{
 		}
 
 		resolver := machineResolver(ctx, clients)
-		target := selectMachineShape(resolver, current.Arch)
+		target := resolveShape(resolver, "modify", current.Arch, string(modifyFlags.shape), string(modifyFlags.class))
 		vcpu, memoryGB, arches, err := resolver.Details(ctx, target.InstanceType)
 		if err != nil {
 			u.PrintFatal(fmt.Sprintf("Failed to read the details of %s", target.InstanceType), err)
@@ -49,4 +55,9 @@ var modifyCmd = &cobra.Command{
 		u.PrintSuccess(fmt.Sprintf("%s runs %s at %s", name, modified.InstanceType, modified.PublicIP))
 		u.PrintInfo(fmt.Sprintf("%d vCPU, %d GB memory, %d GB disk", modified.VCPU, modified.MemoryGB, modified.DiskGB))
 	},
+}
+
+func init() {
+	modifyCmd.Flags().Var(&modifyFlags.shape, "shape", "vCPU and memory, one of "+strings.Join(shapeValues(), ", "))
+	modifyCmd.Flags().Var(&modifyFlags.class, "class", "Instance class")
 }

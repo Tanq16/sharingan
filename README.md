@@ -31,7 +31,7 @@ curl -fLo sharingan https://github.com/tanq16/sharingan/releases/latest/download
 chmod +x sharingan && mv sharingan /usr/local/bin/
 ```
 
-Building from source needs Go 1.26.5 or newer:
+Building from source needs Go 1.27.0 or newer:
 
 ```bash
 git clone https://github.com/tanq16/sharingan && cd sharingan && make build
@@ -39,7 +39,7 @@ git clone https://github.com/tanq16/sharingan && cd sharingan && make build
 
 ## Usage
 
-Every command except `set-config` reads the active profile and region from `~/.config/sharingan/config.json` and exits non-zero when it is missing. `--debug` turns on verbose logging and `--for-ai` switches to plain text output with piped input, for driving the tool from a script or an agent.
+Every command except `set-config` reads the active profile and region from `~/.config/sharingan/config.json` and exits non-zero when it is missing. `--debug` turns on verbose logging. Output drops its colors on its own whenever it is piped, so a script or an agent needs no flag for that.
 
 ```bash
 sharingan set-config --profile my-profile --region us-east-2
@@ -50,19 +50,19 @@ sharingan ssh devbox
 
 | Command | Behaviour |
 |---|---|
-| `set-config [--profile P] [--region R]` | Writes `config.json`. With no flags it prompts for both. There is no default profile and no default region. |
+| `set-config [--profile P] [--region R]` | Writes `config.json`. Each value it was not given is prompted for. There is no default profile and no default region. |
 | `setup` | Creates whatever scaffolding the region is missing. Idempotent, so it is safe to rerun. |
 | `teardown` | Deletes the scaffolding. Refuses while any managed instance still exists. |
-| `create <name>` | Prompts for size, architecture, and disk, then launches Ubuntu 26.04 with Docker, zsh, Homebrew, and `cps` installed by cloud-init. |
+| `create <name> [--arch A] [--shape S] [--class C] [--disk GB]` | Launches Ubuntu 26.04 with Docker, zsh, Homebrew, and `cps` installed by cloud-init. Each value it was not given is prompted for. |
 | `start <name>` / `stop <name>` | Starts or stops the machine and waits for it to settle. |
-| `modify <name>` | Changes vCPU and RAM on the same architecture. Disk size cannot change. |
+| `modify <name> [--shape S] [--class C]` | Changes vCPU and RAM on the same architecture. Disk size cannot change. |
 | `rm <name>` | Terminates the machine and its root volume. Requires the name retyped, or `--yes`. |
 | `ssh <name> [args...]` | Execs the system `ssh`, so `ssh_config`, agents, and `ProxyJump` all still apply. Trailing arguments pass through. |
 | `status <name>` | Reports cloud-init and bootstrap progress over SSH. |
 | `show [--origin]` | Table of local state, or the same table rebuilt from live API queries. |
-| `costs` | Table of every size, architecture, class, and disk combination with its monthly price. |
+| `costs` | One table per architecture of every size, class, and disk combination with its monthly price, then the stopped price. |
 
-Sizes are offered as fourteen vCPU and RAM shapes across two classes, burstable and dedicated, on `x86_64` and `arm64`. The concrete instance type is resolved live: the cheapest modern-family type that is sold in the active region and matches the shape exactly. Disk size is independent of the shape, from 50 GB to 500 GB.
+Sizes are offered as fourteen vCPU and RAM shapes across two classes, burstable and dedicated, on `x86_64` and `arm64`. `--shape` names one as `4vcpu-16gb`. The concrete instance type is resolved live: the cheapest modern-family type that is sold in the active region and matches the shape exactly. Disk size is independent of the shape, from 50 GB to 500 GB.
 
 ### Configuration
 

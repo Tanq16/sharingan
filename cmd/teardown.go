@@ -15,6 +15,7 @@ var teardownCmd = &cobra.Command{
 	Use:   "teardown",
 	Short: "Delete the scaffolding for the active account and region",
 	Long:  "Delete the VPC, subnet, internet gateway, route table, security group, and key pair. Refuses while managed instances exist.",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := u.LoadConfig()
 		if err != nil {

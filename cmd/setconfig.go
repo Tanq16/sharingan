@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -15,17 +16,16 @@ var setConfigFlags struct {
 var setConfigCmd = &cobra.Command{
 	Use:   "set-config",
 	Short: "Set the active AWS profile and region",
-	Long:  "Set the active AWS profile and region. Run without flags to pick them interactively.",
+	Long:  "Set the active AWS profile and region. Anything not given as a flag is chosen interactively.",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		profile, region := setConfigFlags.profile, setConfigFlags.region
-		if profile == "" && region == "" {
-			profile, region = promptProfileAndRegion()
-		}
+		profile := setConfigFlags.profile
 		if profile == "" {
-			u.PrintFatal("--profile is required", nil)
+			profile = promptProfile()
 		}
+		region := setConfigFlags.region
 		if region == "" {
-			u.PrintFatal("--region is required", nil)
+			region = promptRegion()
 		}
 
 		cfg := &u.Config{Profile: profile, Region: region}
@@ -36,7 +36,7 @@ var setConfigCmd = &cobra.Command{
 	},
 }
 
-func promptProfileAndRegion() (string, string) {
+func promptProfile() string {
 	profiles, err := u.AvailableProfiles()
 	if err != nil {
 		u.PrintFatal("Failed to read AWS profiles", err)
@@ -46,18 +46,30 @@ func promptProfileAndRegion() (string, string) {
 	}
 
 	index, err := u.PromptSelect("Select an AWS profile:", profiles)
+	if errors.Is(err, u.ErrNoTerminal) {
+		u.PrintFatal("set-config needs --profile when there is no interactive terminal", nil)
+	}
 	if err != nil {
 		u.PrintFatal("Failed to read the profile selection", err)
 	}
 	if index < 0 {
 		u.PrintFatal("No profile selected", nil)
 	}
+	return profiles[index]
+}
 
+func promptRegion() string {
 	region, err := u.PromptInput("AWS region:", "us-east-2")
+	if errors.Is(err, u.ErrNoTerminal) {
+		u.PrintFatal("set-config needs --region when there is no interactive terminal", nil)
+	}
 	if err != nil {
 		u.PrintFatal("Failed to read the region", err)
 	}
-	return profiles[index], region
+	if region == "" {
+		u.PrintFatal("No region entered", nil)
+	}
+	return region
 }
 
 func init() {

@@ -17,6 +17,7 @@ var showCmd = &cobra.Command{
 	Use:   "show",
 	Short: "List the machines for the active account and region",
 	Long:  "List the machines recorded in local state, or with --origin the machines AWS reports right now.",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := u.LoadConfig()
 		if err != nil {

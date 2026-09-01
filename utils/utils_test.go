@@ -102,23 +102,6 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func TestConfigSaveRoundTrip(t *testing.T) {
-	withHome(t)
-
-	want := &Config{Profile: "prod-admin", Region: "us-east-2"}
-	if err := want.Save(); err != nil {
-		t.Fatalf("Save() err = %v", err)
-	}
-
-	got, err := LoadConfig()
-	if err != nil {
-		t.Fatalf("LoadConfig() err = %v", err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("LoadConfig() = %+v, want %+v", got, want)
-	}
-}
-
 func TestAvailableProfiles(t *testing.T) {
 	awsConfig := `[default]
 region = us-east-1

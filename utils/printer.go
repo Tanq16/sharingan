@@ -58,75 +58,59 @@ func PrintFatal(msg string, err error) {
 }
 
 func PrintGeneric(msg string) {
-	fmt.Println(msg)
+	lipgloss.Println(msg)
 }
 
 func printInfo(indent, msg string) {
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		log.Info().Msg(msg)
-	case GlobalForAIFlag:
-		fmt.Println("[INFO] " + msg)
-	default:
-		fmt.Println(infoStyle.Render(indent + "→ " + msg))
+		return
 	}
+	lipgloss.Println(infoStyle.Render(indent + "→ " + msg))
 }
 
 func printSuccess(indent, msg string) {
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		log.Info().Msg(msg)
-	case GlobalForAIFlag:
-		fmt.Println("[OK] " + msg)
-	default:
-		fmt.Println(successStyle.Render(indent + "✓ " + msg))
+		return
 	}
+	lipgloss.Println(successStyle.Render(indent + "✓ " + msg))
 }
 
 func printError(indent, msg string, err error) {
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		if err != nil {
 			log.Error().Err(err).Msg(msg)
 		} else {
 			log.Error().Msg(msg)
 		}
-	case GlobalForAIFlag:
-		fmt.Println("[ERROR] " + msg)
-	default:
-		fmt.Println(errorStyle.Render(indent + "✗ " + msg))
+		return
 	}
+	lipgloss.Println(errorStyle.Render(indent + "✗ " + msg))
 }
 
 func printWarn(indent, msg string, err error) {
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		if err != nil {
 			log.Warn().Err(err).Msg(msg)
 		} else {
 			log.Warn().Msg(msg)
 		}
-	case GlobalForAIFlag:
-		fmt.Println("[WARN] " + msg)
-	default:
-		fmt.Println(warnStyle.Render(indent + "! " + msg))
+		return
 	}
+	lipgloss.Println(warnStyle.Render(indent + "! " + msg))
 }
 
 func printRunning(indent, msg string) {
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		log.Info().Msg(msg)
-	case GlobalForAIFlag:
-		fmt.Println("[RUNNING] " + msg)
-	default:
-		fmt.Println(infoStyle.Render(indent + "↻ " + msg))
+		return
 	}
+	lipgloss.Println(infoStyle.Render(indent + "↻ " + msg))
 }
 
-// Clearing is a no-op in debug and AI modes so every line survives being logged or parsed.
 func ClearLines(n int) {
-	if GlobalDebugFlag || GlobalForAIFlag {
+	if GlobalDebugFlag || !StdoutIsTerminal {
 		return
 	}
 	for range n {
@@ -141,15 +125,16 @@ func ClearPreviousLine() {
 func PrintProgress(label string, percent int) {
 	percent = min(max(percent, 0), 100)
 
-	switch {
-	case GlobalDebugFlag:
+	if GlobalDebugFlag {
 		log.Info().Int("percent", percent).Msg(label)
-	case GlobalForAIFlag:
-		fmt.Printf("[PROGRESS] %s: %d%%\n", label, percent)
-	default:
-		const barWidth = 10
-		filled := barWidth * percent / 100
-		bar := strings.Repeat("⣿", filled) + strings.Repeat("⣀", barWidth-filled)
-		fmt.Println(infoStyle.Render(fmt.Sprintf("  ↻ %s: %s %d%%", label, bar, percent)))
+		return
 	}
+	if !StdoutIsTerminal {
+		lipgloss.Println(fmt.Sprintf("  ↻ %s: %d%%", label, percent))
+		return
+	}
+	const barWidth = 10
+	filled := barWidth * percent / 100
+	bar := strings.Repeat("⣿", filled) + strings.Repeat("⣀", barWidth-filled)
+	lipgloss.Println(infoStyle.Render(fmt.Sprintf("  ↻ %s: %s %d%%", label, bar, percent)))
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -23,6 +24,9 @@ var rmCmd = &cobra.Command{
 		if !rmFlags.yes {
 			u.PrintWarn(fmt.Sprintf("%s and its root volume are deleted permanently", name), nil)
 			typed, err := u.PromptInput("Retype the machine name to confirm:", name)
+			if errors.Is(err, u.ErrNoTerminal) {
+				u.PrintFatal("rm needs --yes when there is no interactive terminal", nil)
+			}
 			if err != nil {
 				u.PrintFatal("Failed to read the confirmation", err)
 			}
@@ -43,5 +47,5 @@ var rmCmd = &cobra.Command{
 }
 
 func init() {
-	rmCmd.Flags().BoolVarP(&rmFlags.yes, "yes", "y", false, "Skip the confirmation prompt")
+	rmCmd.Flags().BoolVar(&rmFlags.yes, "yes", false, "Skip the confirmation prompt")
 }
