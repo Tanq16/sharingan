@@ -56,16 +56,7 @@ func Table(machines []Machine) ([]string, [][]string) {
 	return headers(), rows
 }
 
-func ScopedTable(machines []Machine) ([]string, [][]string) {
-	loc := u.LocalLocation()
-	rows := make([][]string, 0, len(machines))
-	for _, m := range machines {
-		rows = append(rows, append([]string{text(m.Profile), text(m.Region)}, row(m, loc)...))
-	}
-	return append([]string{"PROFILE", "REGION"}, headers()...), rows
-}
-
-func Sort(machines []Machine) {
+func sortMachines(machines []Machine) {
 	slices.SortFunc(machines, func(a, b Machine) int {
 		return cmp.Or(
 			cmp.Compare(a.Profile, b.Profile),
@@ -119,7 +110,7 @@ func fromInstances(instances []awsx.Instance, shapes map[string]shape, profile, 
 			Created:      instance.Launched,
 		})
 	}
-	Sort(machines)
+	sortMachines(machines)
 	return machines
 }
 

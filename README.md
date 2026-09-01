@@ -49,6 +49,7 @@ sharingan ssh devbox
 
 sharingan set-config --profile other-profile --region eu-west-1
 sharingan use my-profile
+sharingan show --profiles
 sharingan show --all
 ```
 
@@ -64,7 +65,7 @@ sharingan show --all
 | `rm <name>` | Terminates the machine and its root volume. Requires the name retyped, or `--yes`. |
 | `ssh <name> [args...]` | Execs the system `ssh`, so `ssh_config`, agents, and `ProxyJump` all still apply. Trailing arguments pass through. |
 | `status <name>` | Reports cloud-init and bootstrap progress over SSH. |
-| `show [--all]` | Table of the machines AWS reports right now, for the active profile or with `--all` for every registered one. |
+| `show [--all] [--profiles]` | Table of the machines AWS reports right now for the active profile. `--all` renders one table per registered profile, and `--profiles` lists the registry itself with each profile's AWS account and region. |
 | `costs` | One table per architecture of every size, class, and disk combination with its monthly price, then the stopped price. |
 
 Sizes are offered as fourteen vCPU and RAM shapes across two classes, burstable and dedicated, on `x86_64` and `arm64`. `--shape` names one as `4vcpu-16gb`. The concrete instance type is resolved live: the cheapest modern-family type that is sold in the active region and matches the shape exactly. Disk size is independent of the shape, from 50 GB to 500 GB.
