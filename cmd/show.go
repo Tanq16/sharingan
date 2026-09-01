@@ -27,24 +27,82 @@ var showCmd = &cobra.Command{
 			showEveryProfile(cmd.Context())
 			return
 		}
-		clients := activeClients(cmd.Context())
-
-		u.PrintRunning(fmt.Sprintf("Querying %s", clients.Region))
-		machines, err := inventory.FromAPI(cmd.Context(), clients)
-		u.ClearLines(1)
-		if err != nil {
-			u.PrintFatal("Failed to read the machine inventory", err)
-		}
-
-		if len(machines) == 0 {
-			u.PrintInfo(fmt.Sprintf("No machines in account %s region %s", clients.Account, clients.Region))
-			return
-		}
-		u.PrintTable(inventory.Table(machines))
+		showActiveProfile(cmd.Context())
 	},
 }
 
+func showActiveProfile(ctx context.Context) {
+	clients := activeClients(ctx)
+
+	u.PrintRunning(fmt.Sprintf("Querying %s", clients.Region))
+	machines, err := inventory.FromAPI(ctx, clients)
+	u.ClearLines(1)
+	if err != nil {
+		u.PrintFatal("Failed to read the machine inventory", err)
+	}
+
+	if len(machines) == 0 {
+		u.PrintInfo(fmt.Sprintf("No machines in account %s region %s", clients.Account, clients.Region))
+		return
+	}
+	u.PrintTable(inventory.Table(machines))
+}
+
 func showEveryProfile(ctx context.Context) {
+	cfg, names := registeredProfiles()
+	results := make([]profileInventory, len(names))
+
+	u.PrintRunning(fmt.Sprintf("Querying %d profiles", len(names)))
+	inParallel(len(names), func(i int) {
+		results[i] = queryProfile(ctx, names[i], cfg.Region(names[i]))
+	})
+	u.ClearLines(1)
+
+	var failed int
+	for _, r := range results {
+		if r.err != nil {
+			failed++
+			u.PrintWarn(fmt.Sprintf("Skipped profile %s in %s", r.profile, r.region), r.err)
+		}
+	}
+	if failed == len(names) {
+		u.PrintFatal("Failed to query every registered profile", nil)
+	}
+
+	for _, r := range results {
+		if r.err != nil {
+			continue
+		}
+		if len(r.machines) == 0 {
+			u.PrintInfo(fmt.Sprintf("No machines in profile %s, account %s, region %s", r.profile, r.account, r.region))
+			continue
+		}
+		u.PrintInfo(fmt.Sprintf("Profile %s, account %s, region %s", r.profile, r.account, r.region))
+		u.PrintTable(inventory.Table(r.machines))
+	}
+}
+
+type profileInventory struct {
+	profile  string
+	region   string
+	account  string
+	machines []inventory.Machine
+	err      error
+}
+
+func queryProfile(ctx context.Context, profile, region string) profileInventory {
+	result := profileInventory{profile: profile, region: region}
+	clients, err := awsx.New(ctx, profile, region)
+	if err != nil {
+		result.err = err
+		return result
+	}
+	result.account = clients.Account
+	result.machines, result.err = inventory.FromAPI(ctx, clients)
+	return result
+}
+
+func registeredProfiles() (*u.Config, []string) {
 	cfg, err := u.LoadConfig()
 	if err != nil {
 		u.PrintFatal("Failed to read the sharingan configuration", err)
@@ -53,53 +111,20 @@ func showEveryProfile(ctx context.Context) {
 	if len(names) == 0 {
 		u.PrintFatal("No AWS profile is registered, run `sharingan set-config` to add one", nil)
 	}
+	return cfg, names
+}
 
-	type result struct {
-		machines []inventory.Machine
-		err      error
-	}
-	results := make([]result, len(names))
+func inParallel(n int, fn func(int)) {
 	sem := make(chan struct{}, showWorkers)
 	var wg sync.WaitGroup
-
-	u.PrintRunning(fmt.Sprintf("Querying %d profiles", len(names)))
-	for i, name := range names {
+	for i := range n {
 		sem <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-sem }()
-			results[i].machines, results[i].err = profileMachines(ctx, name, cfg.Region(name))
+			fn(i)
 		})
 	}
 	wg.Wait()
-	u.ClearLines(1)
-
-	var machines []inventory.Machine
-	var failed int
-	for i, r := range results {
-		if r.err != nil {
-			failed++
-			u.PrintWarn(fmt.Sprintf("Skipped profile %s in %s", names[i], cfg.Region(names[i])), r.err)
-			continue
-		}
-		machines = append(machines, r.machines...)
-	}
-	if failed == len(names) {
-		u.PrintFatal("Failed to query every registered profile", nil)
-	}
-	if len(machines) == 0 {
-		u.PrintInfo("No machines in any registered profile")
-		return
-	}
-	inventory.Sort(machines)
-	u.PrintTable(inventory.ScopedTable(machines))
-}
-
-func profileMachines(ctx context.Context, profile, region string) ([]inventory.Machine, error) {
-	clients, err := awsx.New(ctx, profile, region)
-	if err != nil {
-		return nil, err
-	}
-	return inventory.FromAPI(ctx, clients)
 }
 
 func init() {
