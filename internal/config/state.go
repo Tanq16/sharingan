@@ -1,7 +1,8 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -69,14 +70,13 @@ func (s *State) Save() error {
 	if s.Accounts == nil {
 		s.Accounts = map[string]map[string]*RegionState{}
 	}
-	data, err := json.MarshalIndent(s, "", "  ")
+	data, err := json.Marshal(s, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(StatePath(), append(data, '\n'), 0o600)
 }
 
-// Creates the account and region entry when absent, so the caller can write into it.
 func (s *State) Region(account, region string) *RegionState {
 	if s.Accounts == nil {
 		s.Accounts = map[string]map[string]*RegionState{}
