@@ -13,6 +13,7 @@ var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Create any missing scaffolding for the active account and region",
 	Long:  "Create the VPC, subnet, internet gateway, route table, security group, and key pair that machines launch into. Safe to re-run.",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := u.LoadConfig()
 		if err != nil {

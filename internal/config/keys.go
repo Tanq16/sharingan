@@ -40,7 +40,7 @@ func EnsureKeyPair() ([]byte, error) {
 	authorized := ssh.MarshalAuthorizedKey(pub)
 
 	if _, err := os.Stat(PubKeyPath()); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(PubKeyPath(), authorized, 0o644); err != nil {
+		if err := os.WriteFile(PubKeyPath(), authorized, 0o600); err != nil {
 			return nil, err
 		}
 	} else if err != nil {
