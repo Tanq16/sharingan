@@ -6,58 +6,7 @@ import (
 	"time"
 
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 )
-
-func names(machines []Machine) []string {
-	out := make([]string, 0, len(machines))
-	for _, m := range machines {
-		out = append(out, m.Name)
-	}
-	return out
-}
-
-func TestFromRegionState(t *testing.T) {
-	tests := []struct {
-		name      string
-		region    *config.RegionState
-		wantNames []string
-	}{
-		{name: "no entry for the account and region", region: nil, wantNames: []string{}},
-		{
-			name:      "entry with no machines",
-			region:    &config.RegionState{VPCID: "vpc-1", Machines: map[string]*config.Machine{}},
-			wantNames: []string{},
-		},
-		{
-			name: "machines come back sorted by name",
-			region: &config.RegionState{Machines: map[string]*config.Machine{
-				"zeta":  {InstanceID: "i-2"},
-				"alpha": {InstanceID: "i-1"},
-				"mid":   {InstanceID: "i-3"},
-			}},
-			wantNames: []string{"alpha", "mid", "zeta"},
-		},
-		{
-			name: "nil machine entry is skipped",
-			region: &config.RegionState{Machines: map[string]*config.Machine{
-				"serko":  {InstanceID: "i-1"},
-				"broken": nil,
-			}},
-			wantNames: []string{"serko"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := fromRegionState(tt.region)
-			if !slices.Equal(names(got), tt.wantNames) {
-				t.Errorf("fromRegionState() names = %v, want %v", names(got), tt.wantNames)
-			}
-		})
-	}
-
-}
 
 func TestFromInstances(t *testing.T) {
 	launched := time.Date(2026, 8, 20, 15, 4, 5, 0, time.UTC)
@@ -76,6 +25,7 @@ func TestFromInstances(t *testing.T) {
 				State: "running", PublicIP: "3.129.210.133", DiskGB: 120, Launched: launched,
 			}},
 			want: []Machine{{
+				Profile: "work", Region: "us-east-2",
 				Name: "serko", InstanceID: "i-1", InstanceType: "m7g.xlarge", Arch: "arm64",
 				VCPU: 4, MemoryGB: 16, DiskGB: 120, PublicIP: "3.129.210.133",
 				State: "running", Created: launched,
@@ -85,6 +35,7 @@ func TestFromInstances(t *testing.T) {
 			name:      "unknown instance type leaves the shape unset",
 			instances: []awsx.Instance{{ID: "i-1", Name: "serko", Type: "m9z.nano", State: "running"}},
 			want: []Machine{{
+				Profile: "work", Region: "us-east-2",
 				Name: "serko", InstanceID: "i-1", InstanceType: "m9z.nano", State: "running",
 			}},
 		},
@@ -95,15 +46,15 @@ func TestFromInstances(t *testing.T) {
 				{ID: "i-1", State: "running"},
 			},
 			want: []Machine{
-				{InstanceID: "i-1", State: "running"},
-				{Name: "serko", InstanceID: "i-2", State: "stopped"},
+				{Profile: "work", Region: "us-east-2", InstanceID: "i-1", State: "running"},
+				{Profile: "work", Region: "us-east-2", Name: "serko", InstanceID: "i-2", State: "stopped"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := fromInstances(tt.instances, shapes)
+			got := fromInstances(tt.instances, shapes, "work", "us-east-2")
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("fromInstances() = %+v, want %+v", got, tt.want)
 			}

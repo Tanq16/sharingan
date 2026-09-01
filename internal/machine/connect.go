@@ -81,8 +81,5 @@ func connectIP(ctx context.Context, c *awsx.Clients, name string) (string, error
 	if inst.PublicIP == "" {
 		return "", fmt.Errorf("%s is %s and has no public address", name, inst.State)
 	}
-	if _, err := updateMachine(c, name, func(entry *config.Machine) { observe(entry, inst) }); err != nil {
-		return "", err
-	}
 	return inst.PublicIP, nil
 }

@@ -18,11 +18,11 @@ var startCmd = &cobra.Command{
 		clients := activeClients(ctx)
 
 		u.PrintRunning(fmt.Sprintf("starting %s", name))
-		started, err := machine.Start(ctx, clients, machine.StartConfig{Name: name})
+		ip, err := machine.Start(ctx, clients, machine.StartConfig{Name: name})
 		u.ClearLines(1)
 		if err != nil {
 			u.PrintFatal(fmt.Sprintf("Failed to start %s", name), err)
 		}
-		u.PrintSuccess(fmt.Sprintf("%s is running at %s", name, started.PublicIP))
+		u.PrintSuccess(fmt.Sprintf("%s is running at %s", name, ip))
 	},
 }

@@ -5,13 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 	u "github.com/tanq16/sharingan/utils"
 )
 
@@ -37,7 +35,7 @@ func (cfg CreateConfig) validate() error {
 	return err
 }
 
-func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Machine, error) {
+func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*Info, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -49,12 +47,8 @@ func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Mac
 		return nil, fmt.Errorf("a machine named %q already exists as %s (%s)", cfg.Name, existing.ID, existing.State)
 	}
 
-	state, err := config.LoadState()
+	scaffolding, err := findScaffolding(ctx, c)
 	if err != nil {
-		return nil, err
-	}
-	region := state.Region(c.Account, c.Region)
-	if err := fillScaffolding(ctx, c, region); err != nil {
 		return nil, err
 	}
 
@@ -69,9 +63,9 @@ func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Mac
 		InstanceType:     ec2types.InstanceType(cfg.InstanceType),
 		MinCount:         aws.Int32(1),
 		MaxCount:         aws.Int32(1),
-		KeyName:          aws.String(region.KeyPairName),
-		SubnetId:         aws.String(region.SubnetID),
-		SecurityGroupIds: []string{region.SecurityGroupID},
+		KeyName:          aws.String(scaffolding.keyPairName),
+		SubnetId:         aws.String(scaffolding.subnetID),
+		SecurityGroupIds: []string{scaffolding.securityGroupID},
 		BlockDeviceMappings: []ec2types.BlockDeviceMapping{{
 			DeviceName: aws.String(rootDevice),
 			Ebs: &ec2types.EbsBlockDevice{
@@ -108,46 +102,42 @@ func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Mac
 		return nil, err
 	}
 
-	entry := &config.Machine{
-		InstanceID:   id,
+	return &Info{
 		InstanceType: cfg.InstanceType,
 		Arch:         cfg.Arch,
 		VCPU:         cfg.VCPU,
 		MemoryGB:     cfg.MemoryGB,
 		DiskGB:       cfg.DiskGB,
 		PublicIP:     ip,
-		State:        string(ec2types.InstanceStateNameRunning),
-		Created:      time.Now().UTC(),
-	}
-	region.Machines[cfg.Name] = entry
-	if err := state.Save(); err != nil {
-		return nil, err
-	}
-	return entry, nil
+	}, nil
 }
 
-func fillScaffolding(ctx context.Context, c *awsx.Clients, region *config.RegionState) error {
+type scaffolding struct {
+	subnetID        string
+	securityGroupID string
+	keyPairName     string
+}
+
+func findScaffolding(ctx context.Context, c *awsx.Clients) (*scaffolding, error) {
+	var found scaffolding
 	lookups := []struct {
 		kind  string
 		field *string
 		find  func(context.Context) (string, error)
 	}{
-		{"subnet", &region.SubnetID, c.FindSubnet},
-		{"security group", &region.SecurityGroupID, c.FindSecurityGroup},
-		{"key pair", &region.KeyPairName, c.FindKeyPair},
+		{"subnet", &found.subnetID, c.FindSubnet},
+		{"security group", &found.securityGroupID, c.FindSecurityGroup},
+		{"key pair", &found.keyPairName, c.FindKeyPair},
 	}
 	for _, lookup := range lookups {
-		if *lookup.field != "" {
-			continue
-		}
-		found, err := lookup.find(ctx)
+		id, err := lookup.find(ctx)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if found == "" {
-			return fmt.Errorf("no managed %s in %s, run `sharingan setup`", lookup.kind, c.Region)
+		if id == "" {
+			return nil, fmt.Errorf("no managed %s in %s, run `sharingan setup`", lookup.kind, c.Region)
 		}
-		*lookup.field = found
+		*lookup.field = id
 	}
-	return nil
+	return &found, nil
 }
