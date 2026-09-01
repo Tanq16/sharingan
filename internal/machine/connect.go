@@ -29,7 +29,7 @@ func SSH(ctx context.Context, c *awsx.Clients, cfg SSHConfig) error {
 	if err != nil {
 		return err
 	}
-	args := sshArgs(cfg.Name, ip, config.KeyPath(), config.KnownHostsPath(), cfg.Args)
+	args := sshArgs(hostKeyAlias(c, cfg.Name), ip, config.KeyPath(), config.KnownHostsPath(), cfg.Args)
 	return syscall.Exec(sshPath, args, os.Environ())
 }
 
@@ -46,7 +46,7 @@ func Status(ctx context.Context, c *awsx.Clients, cfg StatusConfig) (string, err
 	if err != nil {
 		return "", err
 	}
-	args := sshArgs(cfg.Name, ip, config.KeyPath(), config.KnownHostsPath(), []string{probeCommand})
+	args := sshArgs(hostKeyAlias(c, cfg.Name), ip, config.KeyPath(), config.KnownHostsPath(), []string{probeCommand})
 
 	probe := exec.CommandContext(ctx, sshPath, args[1:]...)
 	var stderr strings.Builder
@@ -61,16 +61,20 @@ func Status(ctx context.Context, c *awsx.Clients, cfg StatusConfig) (string, err
 	return strings.TrimSpace(string(out)), nil
 }
 
-// HostKeyAlias pins the host key to the machine name, because the public IP changes on every start.
-func sshArgs(name, ip, keyPath, knownHostsPath string, passthrough []string) []string {
+// HostKeyAlias pins the host key to the account, region, and machine name, because the public IP changes on every start.
+func sshArgs(alias, ip, keyPath, knownHostsPath string, passthrough []string) []string {
 	args := []string{"ssh",
 		"-i", keyPath,
 		"-o", "UserKnownHostsFile=" + knownHostsPath,
 		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "HostKeyAlias=sharingan-" + name,
+		"-o", "HostKeyAlias=" + alias,
 		sshUser + "@" + ip,
 	}
 	return append(args, passthrough...)
+}
+
+func hostKeyAlias(c *awsx.Clients, name string) string {
+	return fmt.Sprintf("sharingan-%s-%s-%s", c.Account, c.Region, name)
 }
 
 func connectIP(ctx context.Context, c *awsx.Clients, name string) (string, error) {
