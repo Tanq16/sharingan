@@ -5,13 +5,14 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 )
 
-const setConfigHint = "run `sharingan set-config` to choose an AWS profile and region"
+const setConfigHint = "run `sharingan set-config` to register an AWS profile and region"
 
 func Dir() string {
 	home, _ := os.UserHomeDir()
@@ -24,16 +25,20 @@ func EnsureDir() error {
 	return os.MkdirAll(Dir(), 0o700)
 }
 
+type Profile struct {
+	Region string `json:"region"`
+}
+
 type Config struct {
-	Profile string `json:"profile"`
-	Region  string `json:"region"`
+	Current  string              `json:"current"`
+	Profiles map[string]*Profile `json:"profiles"`
 }
 
 func LoadConfig() (*Config, error) {
 	data, err := os.ReadFile(ConfigPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("no configuration at %s: %s", ConfigPath(), setConfigHint)
+			return &Config{Profiles: map[string]*Profile{}}, nil
 		}
 		return nil, err
 	}
@@ -41,15 +46,8 @@ func LoadConfig() (*Config, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("%s is not valid json: %w", ConfigPath(), err)
 	}
-	var missing []string
-	if c.Profile == "" {
-		missing = append(missing, "profile")
-	}
-	if c.Region == "" {
-		missing = append(missing, "region")
-	}
-	if len(missing) > 0 {
-		return nil, fmt.Errorf("%s is missing %s: %s", ConfigPath(), strings.Join(missing, " and "), setConfigHint)
+	if c.Profiles == nil {
+		c.Profiles = map[string]*Profile{}
 	}
 	return &c, nil
 }
@@ -58,11 +56,58 @@ func (c *Config) Save() error {
 	if err := EnsureDir(); err != nil {
 		return err
 	}
+	if c.Profiles == nil {
+		c.Profiles = map[string]*Profile{}
+	}
 	data, err := json.Marshal(c, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(ConfigPath(), append(data, '\n'), 0o600)
+}
+
+func (c *Config) Names() []string {
+	return slices.Sorted(maps.Keys(c.Profiles))
+}
+
+func (c *Config) Region(profile string) string {
+	if p := c.Profiles[profile]; p != nil {
+		return p.Region
+	}
+	return ""
+}
+
+func (c *Config) Register(profile, region string) {
+	if c.Profiles == nil {
+		c.Profiles = map[string]*Profile{}
+	}
+	c.Profiles[profile] = &Profile{Region: region}
+	c.Current = profile
+}
+
+func (c *Config) Use(profile string) error {
+	if _, ok := c.Profiles[profile]; !ok {
+		return fmt.Errorf("%s is not registered, the registered profiles are %s", profile, strings.Join(c.Names(), ", "))
+	}
+	c.Current = profile
+	return nil
+}
+
+func (c *Config) Active() (string, string, error) {
+	if len(c.Profiles) == 0 {
+		return "", "", fmt.Errorf("no profile is registered in %s: %s", ConfigPath(), setConfigHint)
+	}
+	if c.Current == "" {
+		return "", "", fmt.Errorf("%s names no current profile: %s", ConfigPath(), setConfigHint)
+	}
+	profile, ok := c.Profiles[c.Current]
+	if !ok {
+		return "", "", fmt.Errorf("current profile %s is not registered in %s: run `sharingan use` to pick one", c.Current, ConfigPath())
+	}
+	if profile.Region == "" {
+		return "", "", fmt.Errorf("profile %s has no region in %s: %s", c.Current, ConfigPath(), setConfigHint)
+	}
+	return c.Current, profile.Region, nil
 }
 
 func AvailableProfiles() ([]string, error) {

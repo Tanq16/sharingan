@@ -16,7 +16,7 @@ var statusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		ctx := cmd.Context()
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 
 		u.PrintRunning(fmt.Sprintf("probing %s over ssh", name))
 		report, err := machine.Status(ctx, clients, machine.StatusConfig{Name: name})

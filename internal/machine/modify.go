@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 )
 
 type ModifyConfig struct {
@@ -22,7 +21,7 @@ type ModifyConfig struct {
 	Arches       []string
 }
 
-func Modify(ctx context.Context, c *awsx.Clients, cfg ModifyConfig) (*config.Machine, error) {
+func Modify(ctx context.Context, c *awsx.Clients, cfg ModifyConfig) (*Info, error) {
 	inst, err := requireInstance(ctx, c, cfg.Name)
 	if err != nil {
 		return nil, err
@@ -63,14 +62,14 @@ func Modify(ctx context.Context, c *awsx.Clients, cfg ModifyConfig) (*config.Mac
 	if err != nil {
 		return nil, err
 	}
-	return updateMachine(c, cfg.Name, func(entry *config.Machine) {
-		observe(entry, inst)
-		entry.InstanceType = cfg.InstanceType
-		entry.VCPU = cfg.VCPU
-		entry.MemoryGB = cfg.MemoryGB
-		entry.PublicIP = ip
-		entry.State = string(ec2types.InstanceStateNameRunning)
-	})
+	return &Info{
+		InstanceType: cfg.InstanceType,
+		Arch:         inst.Arch,
+		VCPU:         cfg.VCPU,
+		MemoryGB:     cfg.MemoryGB,
+		DiskGB:       inst.DiskGB,
+		PublicIP:     ip,
+	}, nil
 }
 
 func validateModify(cfg ModifyConfig, inst *awsx.Instance) error {

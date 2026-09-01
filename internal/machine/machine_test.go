@@ -55,7 +55,7 @@ func TestSSHArgs(t *testing.T) {
 		"-i", "/keys/id_ed25519",
 		"-o", "UserKnownHostsFile=/keys/known_hosts",
 		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "HostKeyAlias=sharingan-serko",
+		"-o", "HostKeyAlias=sharingan-123456789012-us-east-2-serko",
 		"ubuntu@3.129.210.133",
 	}
 	tests := []struct {
@@ -69,7 +69,7 @@ func TestSSHArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sshArgs("serko", "3.129.210.133", "/keys/id_ed25519", "/keys/known_hosts", tt.passthrough)
+			got := sshArgs("sharingan-123456789012-us-east-2-serko", "3.129.210.133", "/keys/id_ed25519", "/keys/known_hosts", tt.passthrough)
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("sshArgs() = %q, want %q", got, tt.want)
 			}

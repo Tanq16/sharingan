@@ -22,7 +22,7 @@ var modifyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		ctx := cmd.Context()
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 
 		current, err := clients.FindInstance(ctx, name)
 		if err != nil {

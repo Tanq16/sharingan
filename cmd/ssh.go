@@ -16,7 +16,7 @@ var sshCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		ctx := cmd.Context()
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 
 		if err := machine.SSH(ctx, clients, machine.SSHConfig{Name: name, Args: args[1:]}); err != nil {
 			u.PrintFatal(fmt.Sprintf("Failed to connect to %s", name), err)

@@ -35,7 +35,7 @@ var rmCmd = &cobra.Command{
 			}
 		}
 
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 		u.PrintRunning(fmt.Sprintf("terminating %s", name))
 		err := machine.Remove(ctx, clients, machine.RemoveConfig{Name: name})
 		u.ClearLines(1)

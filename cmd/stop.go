@@ -15,7 +15,7 @@ var stopCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		ctx := cmd.Context()
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 
 		u.PrintRunning(fmt.Sprintf("stopping %s", name))
 		err := machine.Stop(ctx, clients, machine.StopConfig{Name: name})

@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 )
 
 //go:embed userdata.sh
@@ -27,6 +26,15 @@ const (
 
 	waitTimeout = 10 * time.Minute
 )
+
+type Info struct {
+	InstanceType string
+	Arch         string
+	VCPU         int
+	MemoryGB     int
+	DiskGB       int
+	PublicIP     string
+}
 
 // The parameter path spells x86 as amd64, while every architecture comparison holds x86_64.
 func amiParameter(arch string) (string, error) {
@@ -107,38 +115,4 @@ func waitTerminated(ctx context.Context, c *awsx.Clients, instanceID string) err
 		return fmt.Errorf("waiting for %s to terminate: %w", instanceID, err)
 	}
 	return nil
-}
-
-// The entry is created when absent, so a deleted state.json heals on the next operation.
-func updateMachine(c *awsx.Clients, name string, apply func(*config.Machine)) (*config.Machine, error) {
-	state, err := config.LoadState()
-	if err != nil {
-		return nil, err
-	}
-	region := state.Region(c.Account, c.Region)
-	entry, ok := region.Machines[name]
-	if !ok {
-		entry = &config.Machine{}
-		region.Machines[name] = entry
-	}
-	apply(entry)
-	if err := state.Save(); err != nil {
-		return nil, err
-	}
-	return entry, nil
-}
-
-// Whatever only the cache knows, such as the shape a type was chosen for, survives the refresh.
-func observe(entry *config.Machine, inst *awsx.Instance) {
-	entry.InstanceID = inst.ID
-	entry.InstanceType = inst.Type
-	entry.Arch = inst.Arch
-	entry.State = inst.State
-	entry.PublicIP = inst.PublicIP
-	if inst.DiskGB > 0 {
-		entry.DiskGB = inst.DiskGB
-	}
-	if entry.Created.IsZero() {
-		entry.Created = inst.Launched
-	}
 }

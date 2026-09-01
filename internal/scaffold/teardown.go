@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 )
 
 type InstancesExistError struct {
@@ -43,13 +42,7 @@ func Teardown(ctx context.Context, cfg Config, c *awsx.Clients) error {
 			return err
 		}
 	}
-
-	state, err := config.LoadState()
-	if err != nil {
-		return err
-	}
-	state.DeleteRegion(c.Account, c.Region)
-	return state.Save()
+	return nil
 }
 
 func deleteSecurityGroup(ctx context.Context, cfg Config, c *awsx.Clients) error {

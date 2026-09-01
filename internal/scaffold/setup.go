@@ -34,31 +34,14 @@ func Setup(ctx context.Context, cfg Config, c *awsx.Clients) error {
 	if err != nil {
 		return err
 	}
-	routeTableID, err := ensureRouteTable(ctx, cfg, c, vpcID, igwID, subnetID)
-	if err != nil {
+	if _, err := ensureRouteTable(ctx, cfg, c, vpcID, igwID, subnetID); err != nil {
 		return err
 	}
-	groupID, err := ensureSecurityGroup(ctx, cfg, c, vpcID)
-	if err != nil {
+	if _, err := ensureSecurityGroup(ctx, cfg, c, vpcID); err != nil {
 		return err
 	}
-	keyName, err := ensureKeyPair(ctx, cfg, c)
-	if err != nil {
-		return err
-	}
-
-	state, err := config.LoadState()
-	if err != nil {
-		return err
-	}
-	rs := state.Region(c.Account, c.Region)
-	rs.VPCID = vpcID
-	rs.IGWID = igwID
-	rs.SubnetID = subnetID
-	rs.RouteTableID = routeTableID
-	rs.SecurityGroupID = groupID
-	rs.KeyPairName = keyName
-	return state.Save()
+	_, err = ensureKeyPair(ctx, cfg, c)
+	return err
 }
 
 func ensureVPC(ctx context.Context, cfg Config, c *awsx.Clients) (string, error) {

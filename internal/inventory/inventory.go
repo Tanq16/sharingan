@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/tanq16/sharingan/internal/awsx"
-	"github.com/tanq16/sharingan/internal/config"
 	u "github.com/tanq16/sharingan/utils"
 )
 
@@ -22,6 +21,8 @@ const (
 )
 
 type Machine struct {
+	Profile      string
+	Region       string
 	Name         string
 	InstanceID   string
 	InstanceType string
@@ -34,14 +35,6 @@ type Machine struct {
 	Created      time.Time
 }
 
-func FromState(account, region string) ([]Machine, error) {
-	state, err := config.LoadState()
-	if err != nil {
-		return nil, err
-	}
-	return fromRegionState(state.LookupRegion(account, region)), nil
-}
-
 func FromAPI(ctx context.Context, c *awsx.Clients) ([]Machine, error) {
 	instances, err := c.ManagedInstances(ctx)
 	if err != nil {
@@ -51,28 +44,36 @@ func FromAPI(ctx context.Context, c *awsx.Clients) ([]Machine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return fromInstances(instances, shapes), nil
+	return fromInstances(instances, shapes, c.Profile, c.Region), nil
 }
 
 func Table(machines []Machine) ([]string, [][]string) {
-	headers := []string{"NAME", "INSTANCE ID", "TYPE", "ARCH", "VCPU", "MEMORY", "DISK", "PUBLIC IP", "STATE", "CREATED"}
 	loc := u.LocalLocation()
 	rows := make([][]string, 0, len(machines))
 	for _, m := range machines {
-		rows = append(rows, []string{
-			text(m.Name),
-			text(m.InstanceID),
-			text(m.InstanceType),
-			text(m.Arch),
-			number(m.VCPU),
-			quantity(m.MemoryGB, "GB"),
-			quantity(m.DiskGB, "GB"),
-			text(m.PublicIP),
-			text(m.State),
-			timestamp(m.Created, loc),
-		})
+		rows = append(rows, row(m, loc))
 	}
-	return headers, rows
+	return headers(), rows
+}
+
+func ScopedTable(machines []Machine) ([]string, [][]string) {
+	loc := u.LocalLocation()
+	rows := make([][]string, 0, len(machines))
+	for _, m := range machines {
+		rows = append(rows, append([]string{text(m.Profile), text(m.Region)}, row(m, loc)...))
+	}
+	return append([]string{"PROFILE", "REGION"}, headers()...), rows
+}
+
+func Sort(machines []Machine) {
+	slices.SortFunc(machines, func(a, b Machine) int {
+		return cmp.Or(
+			cmp.Compare(a.Profile, b.Profile),
+			cmp.Compare(a.Region, b.Region),
+			cmp.Compare(a.Name, b.Name),
+			cmp.Compare(a.InstanceID, b.InstanceID),
+		)
+	})
 }
 
 type shape struct {
@@ -80,37 +81,32 @@ type shape struct {
 	memoryGB int
 }
 
-func fromRegionState(rs *config.RegionState) []Machine {
-	if rs == nil {
-		return nil
-	}
-	machines := make([]Machine, 0, len(rs.Machines))
-	for name, m := range rs.Machines {
-		if m == nil {
-			continue
-		}
-		machines = append(machines, Machine{
-			Name:         name,
-			InstanceID:   m.InstanceID,
-			InstanceType: m.InstanceType,
-			Arch:         m.Arch,
-			VCPU:         m.VCPU,
-			MemoryGB:     m.MemoryGB,
-			DiskGB:       m.DiskGB,
-			PublicIP:     m.PublicIP,
-			State:        m.State,
-			Created:      m.Created,
-		})
-	}
-	sortMachines(machines)
-	return machines
+func headers() []string {
+	return []string{"NAME", "INSTANCE ID", "TYPE", "ARCH", "VCPU", "MEMORY", "DISK", "PUBLIC IP", "STATE", "CREATED"}
 }
 
-func fromInstances(instances []awsx.Instance, shapes map[string]shape) []Machine {
+func row(m Machine, loc *time.Location) []string {
+	return []string{
+		text(m.Name),
+		text(m.InstanceID),
+		text(m.InstanceType),
+		text(m.Arch),
+		number(m.VCPU),
+		quantity(m.MemoryGB, "GB"),
+		quantity(m.DiskGB, "GB"),
+		text(m.PublicIP),
+		text(m.State),
+		timestamp(m.Created, loc),
+	}
+}
+
+func fromInstances(instances []awsx.Instance, shapes map[string]shape, profile, region string) []Machine {
 	machines := make([]Machine, 0, len(instances))
 	for _, instance := range instances {
 		s := shapes[instance.Type]
 		machines = append(machines, Machine{
+			Profile:      profile,
+			Region:       region,
 			Name:         instance.Name,
 			InstanceID:   instance.ID,
 			InstanceType: instance.Type,
@@ -123,7 +119,7 @@ func fromInstances(instances []awsx.Instance, shapes map[string]shape) []Machine
 			Created:      instance.Launched,
 		})
 	}
-	sortMachines(machines)
+	Sort(machines)
 	return machines
 }
 
@@ -158,12 +154,6 @@ func instanceShapes(ctx context.Context, c *awsx.Clients, instances []awsx.Insta
 		}
 	}
 	return shapes, nil
-}
-
-func sortMachines(machines []Machine) {
-	slices.SortFunc(machines, func(a, b Machine) int {
-		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.InstanceID, b.InstanceID))
-	})
 }
 
 func text(value string) string {
