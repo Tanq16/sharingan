@@ -16,7 +16,7 @@ It exists so a remote dev box is one command away and costs nothing but disk whi
 
 | Category | Commands | Description |
 |----------|----------|-------------|
-| Configuration | `set-config` | Choose the active AWS profile and region |
+| Configuration | `set-config`, `use` | Register AWS profiles and switch between them |
 | Scaffolding | `setup`, `teardown` | Create and delete the per-region VPC, subnet, gateway, routing, security group, and key pair |
 | Machines | `create`, `start`, `stop`, `modify`, `rm` | Launch a machine, run it, park it, resize it, destroy it |
 | Access | `ssh`, `status` | Connect to a machine and report its bootstrap progress |
@@ -39,18 +39,23 @@ git clone https://github.com/tanq16/sharingan && cd sharingan && make build
 
 ## Usage
 
-Every command except `set-config` reads the active profile and region from `~/.config/sharingan/config.json` and exits non-zero when it is missing. `--debug` turns on verbose logging. Output drops its colors on its own whenever it is piped, so a script or an agent needs no flag for that.
+Every command except `set-config` and `use` acts on the active profile recorded in `~/.config/sharingan/config.json` and exits non-zero when none is set. Any number of profiles can be registered, each with its own region, and `use` switches which one the rest of the commands see. `--debug` turns on verbose logging. Output drops its colors on its own whenever it is piped, so a script or an agent needs no flag for that.
 
 ```bash
 sharingan set-config --profile my-profile --region us-east-2
 sharingan setup
 sharingan create devbox
 sharingan ssh devbox
+
+sharingan set-config --profile other-profile --region eu-west-1
+sharingan use my-profile
+sharingan show --all
 ```
 
 | Command | Behaviour |
 |---|---|
-| `set-config [--profile P] [--region R]` | Writes `config.json`. Each value it was not given is prompted for. There is no default profile and no default region. |
+| `set-config [--profile P] [--region R]` | Registers a profile with its region and makes it active. Each value it was not given is prompted for. There is no default profile and no default region. |
+| `use [profile]` | Switches the active profile. Without a name, the registered profiles are offered for selection. |
 | `setup` | Creates whatever scaffolding the region is missing. Idempotent, so it is safe to rerun. |
 | `teardown` | Deletes the scaffolding. Refuses while any managed instance still exists. |
 | `create <name> [--arch A] [--shape S] [--class C] [--disk GB]` | Launches Ubuntu 26.04 with Docker, zsh, Homebrew, and `cps` installed by cloud-init. Each value it was not given is prompted for. |
@@ -59,7 +64,7 @@ sharingan ssh devbox
 | `rm <name>` | Terminates the machine and its root volume. Requires the name retyped, or `--yes`. |
 | `ssh <name> [args...]` | Execs the system `ssh`, so `ssh_config`, agents, and `ProxyJump` all still apply. Trailing arguments pass through. |
 | `status <name>` | Reports cloud-init and bootstrap progress over SSH. |
-| `show [--origin]` | Table of local state, or the same table rebuilt from live API queries. |
+| `show [--all]` | Table of the machines AWS reports right now, for the active profile or with `--all` for every registered one. |
 | `costs` | One table per architecture of every size, class, and disk combination with its monthly price, then the stopped price. |
 
 Sizes are offered as fourteen vCPU and RAM shapes across two classes, burstable and dedicated, on `x86_64` and `arm64`. `--shape` names one as `4vcpu-16gb`. The concrete instance type is resolved live: the cheapest modern-family type that is sold in the active region and matches the shape exactly. Disk size is independent of the shape, from 50 GB to 500 GB.
@@ -70,8 +75,7 @@ Everything lives under `~/.config/sharingan`, hardcoded, with no environment var
 
 | File | Holds |
 |---|---|
-| `config.json` | The active profile and region, written only by `set-config` |
-| `state.json` | Per account and region: the scaffolding ids and the machines |
+| `config.json` | The registered profiles with their regions, and which one is active |
 | `id_ed25519`, `id_ed25519.pub` | The one key pair every machine authorizes |
 | `known_hosts` | Host keys, scoped to this tool rather than your own |
 
@@ -79,8 +83,8 @@ Everything lives under `~/.config/sharingan`, hardcoded, with no environment var
 
 - **Prices are read live and never shipped.** `costs` and the `create` selector price the region through the AWS Price List API on every run. A failed lookup prints the failure and no numbers.
 - **arm64 is cheaper at an identical shape**, by roughly 11% burstable and 19% dedicated, and nothing in the bootstrap is x86-only.
-- **A stopped machine costs its disk and nothing else.** The public IPv4 address is released on stop, so the address changes on every start. `ssh` pins the host key to the machine name rather than the address, so `known_hosts` stays clean.
-- **`state.json` is a cache, never the source of truth.** Deleting it is recoverable, because every command rediscovers resources by their `ManagedBy=sharingan` tag.
+- **A stopped machine costs its disk and nothing else.** The public IPv4 address is released on stop, so the address changes on every start. `ssh` pins the host key to the account, region, and machine name rather than the address, so `known_hosts` stays clean and two machines sharing a name in different accounts never collide.
+- **AWS is the only source of truth.** Nothing about a machine or a scaffolded resource is cached locally, because every command discovers what it needs by the `ManagedBy=sharingan` tag.
 - **Ports 22 and 443 are open to `0.0.0.0/0`.** SSH is key-only, but whatever you later run behind 443 is reachable by anyone and its own authentication is the only control.
 - **One key means one blast radius.** There is no Session Manager fallback, so losing `id_ed25519` or breaking `sshd` leaves only two ways back in: attach the root volume to another instance, or `rm` the machine.
 - **Disk size is fixed for the life of a machine**, and instances created by other tooling are never adopted.
