@@ -19,7 +19,7 @@ type SSHConfig struct {
 	Args []string
 }
 
-// SSH replaces the running process, so it returns only when the handover fails.
+// The running process is replaced, so this returns only when the handover fails.
 func SSH(ctx context.Context, c *awsx.Clients, cfg SSHConfig) error {
 	ip, err := connectIP(ctx, c, cfg.Name)
 	if err != nil {

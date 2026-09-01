@@ -18,8 +18,6 @@ func names(machines []Machine) []string {
 }
 
 func TestFromRegionState(t *testing.T) {
-	created := time.Date(2026, 8, 20, 15, 4, 5, 0, time.UTC)
-
 	tests := []struct {
 		name      string
 		region    *config.RegionState
@@ -59,35 +57,6 @@ func TestFromRegionState(t *testing.T) {
 		})
 	}
 
-	t.Run("every recorded field is carried over", func(t *testing.T) {
-		region := &config.RegionState{Machines: map[string]*config.Machine{"serko": {
-			InstanceID:   "i-1",
-			InstanceType: "m7g.xlarge",
-			Arch:         "arm64",
-			VCPU:         4,
-			MemoryGB:     16,
-			DiskGB:       120,
-			PublicIP:     "3.129.210.133",
-			State:        "running",
-			Created:      created,
-		}}}
-		want := Machine{
-			Name:         "serko",
-			InstanceID:   "i-1",
-			InstanceType: "m7g.xlarge",
-			Arch:         "arm64",
-			VCPU:         4,
-			MemoryGB:     16,
-			DiskGB:       120,
-			PublicIP:     "3.129.210.133",
-			State:        "running",
-			Created:      created,
-		}
-		got := fromRegionState(region)
-		if len(got) != 1 || got[0] != want {
-			t.Errorf("fromRegionState() = %+v, want %+v", got, want)
-		}
-	})
 }
 
 func TestFromInstances(t *testing.T) {

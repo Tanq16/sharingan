@@ -14,7 +14,6 @@ type Event struct {
 	ID       string
 }
 
-// Progress reaches the caller through Notify, because this package never prints.
 type Config struct {
 	Notify func(Event)
 }

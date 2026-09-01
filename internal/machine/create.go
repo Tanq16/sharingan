@@ -41,7 +41,6 @@ func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Mac
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
-	// A duplicate name would make `ssh <name>` ambiguous.
 	existing, err := c.FindInstance(ctx, cfg.Name)
 	if err != nil {
 		return nil, err
@@ -127,7 +126,6 @@ func Create(ctx context.Context, c *awsx.Clients, cfg CreateConfig) (*config.Mac
 	return entry, nil
 }
 
-// Rediscovery by tag is what makes a deleted state.json recoverable.
 func fillScaffolding(ctx context.Context, c *awsx.Clients, region *config.RegionState) error {
 	lookups := []struct {
 		kind  string

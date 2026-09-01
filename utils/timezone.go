@@ -11,14 +11,11 @@ const (
 	localtimePath   = "/etc/localtime"
 )
 
-// LocalTimezone reports the host zone as an IANA name, which time.Local cannot
-// supply because it renames whatever zone it loaded to "Local".
+// time.Local renames whatever zone it loaded to "Local", so the IANA name comes from the file instead.
 func LocalTimezone() string {
 	return timezoneFrom(localtimePath)
 }
 
-// LocalLocation resolves that same name, so a rendered timestamp and the clock
-// on a machine provisioned from this host never disagree.
 func LocalLocation() *time.Location {
 	return locationFor(LocalTimezone())
 }
