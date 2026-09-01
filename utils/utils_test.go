@@ -24,50 +24,35 @@ func TestLoadConfig(t *testing.T) {
 		writeFile bool
 		want      *Config
 		wantErr   bool
-		wantHint  bool
 	}{
 		{
-			name:      "profile and region",
-			contents:  `{"profile":"prod-admin","region":"us-east-2"}`,
+			name:      "registered profiles",
+			contents:  `{"current":"prod-admin","profiles":{"prod-admin":{"region":"us-east-2"},"dev":{"region":"eu-west-1"}}}`,
 			writeFile: true,
-			want:      &Config{Profile: "prod-admin", Region: "us-east-2"},
+			want: &Config{Current: "prod-admin", Profiles: map[string]*Profile{
+				"prod-admin": {Region: "us-east-2"},
+				"dev":        {Region: "eu-west-1"},
+			}},
 		},
 		{
-			name:     "no file",
-			wantErr:  true,
-			wantHint: true,
-		},
-		{
-			name:      "missing profile",
-			contents:  `{"region":"us-east-2"}`,
-			writeFile: true,
-			wantErr:   true,
-			wantHint:  true,
-		},
-		{
-			name:      "missing region",
-			contents:  `{"profile":"prod-admin"}`,
-			writeFile: true,
-			wantErr:   true,
-			wantHint:  true,
+			name: "no file is an empty registry",
+			want: &Config{Profiles: map[string]*Profile{}},
 		},
 		{
 			name:      "empty object",
 			contents:  `{}`,
 			writeFile: true,
-			wantErr:   true,
-			wantHint:  true,
+			want:      &Config{Profiles: map[string]*Profile{}},
 		},
 		{
-			name:      "empty strings",
-			contents:  `{"profile":"","region":""}`,
+			name:      "null profiles",
+			contents:  `{"current":"dev","profiles":null}`,
 			writeFile: true,
-			wantErr:   true,
-			wantHint:  true,
+			want:      &Config{Current: "dev", Profiles: map[string]*Profile{}},
 		},
 		{
 			name:      "malformed json",
-			contents:  `{"profile":`,
+			contents:  `{"current":`,
 			writeFile: true,
 			wantErr:   true,
 		},
@@ -90,15 +75,103 @@ func TestLoadConfig(t *testing.T) {
 				t.Fatalf("LoadConfig() err = %v, wantErr %v", err, tt.wantErr)
 			}
 			if err != nil {
-				if tt.wantHint && !strings.Contains(err.Error(), "set-config") {
-					t.Errorf("LoadConfig() err = %q, want it to name set-config", err)
-				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("LoadConfig() = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestConfigActive(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      Config
+		wantProfile string
+		wantRegion  string
+		wantErr     bool
+		wantHint    bool
+	}{
+		{
+			name:        "current profile with a region",
+			config:      Config{Current: "dev", Profiles: map[string]*Profile{"dev": {Region: "us-east-2"}}},
+			wantProfile: "dev",
+			wantRegion:  "us-east-2",
+		},
+		{
+			name:     "nothing registered",
+			config:   Config{Profiles: map[string]*Profile{}},
+			wantErr:  true,
+			wantHint: true,
+		},
+		{
+			name:     "no current profile",
+			config:   Config{Profiles: map[string]*Profile{"dev": {Region: "us-east-2"}}},
+			wantErr:  true,
+			wantHint: true,
+		},
+		{
+			name:    "current names an unregistered profile",
+			config:  Config{Current: "gone", Profiles: map[string]*Profile{"dev": {Region: "us-east-2"}}},
+			wantErr: true,
+		},
+		{
+			name:     "current profile has no region",
+			config:   Config{Current: "dev", Profiles: map[string]*Profile{"dev": {}}},
+			wantErr:  true,
+			wantHint: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile, region, err := tt.config.Active()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("Active() err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				if tt.wantHint && !strings.Contains(err.Error(), "set-config") {
+					t.Errorf("Active() err = %q, want it to name set-config", err)
+				}
+				return
+			}
+			if profile != tt.wantProfile || region != tt.wantRegion {
+				t.Errorf("Active() = %q, %q, want %q, %q", profile, region, tt.wantProfile, tt.wantRegion)
+			}
+		})
+	}
+}
+
+func TestConfigRegisterAndUse(t *testing.T) {
+	cfg := &Config{}
+	cfg.Register("dev", "us-east-2")
+	cfg.Register("prod", "eu-west-1")
+
+	if cfg.Current != "prod" {
+		t.Errorf("Current = %q, want the most recently registered profile", cfg.Current)
+	}
+	if !slices.Equal(cfg.Names(), []string{"dev", "prod"}) {
+		t.Errorf("Names() = %v, want [dev prod]", cfg.Names())
+	}
+	if cfg.Region("dev") != "us-east-2" {
+		t.Errorf("Region(dev) = %q, want us-east-2", cfg.Region("dev"))
+	}
+	if cfg.Region("absent") != "" {
+		t.Errorf("Region(absent) = %q, want an empty string", cfg.Region("absent"))
+	}
+
+	if err := cfg.Use("dev"); err != nil {
+		t.Fatalf("Use(dev) err = %v", err)
+	}
+	if cfg.Current != "dev" {
+		t.Errorf("Current = %q, want dev", cfg.Current)
+	}
+	if err := cfg.Use("absent"); err == nil {
+		t.Error("Use(absent) err = nil, want an unregistered profile to be refused")
+	}
+	if cfg.Current != "dev" {
+		t.Errorf("Current = %q, want a refused switch to leave it alone", cfg.Current)
 	}
 }
 

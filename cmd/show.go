@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tanq16/sharingan/internal/awsx"
 	"github.com/tanq16/sharingan/internal/inventory"
 	u "github.com/tanq16/sharingan/utils"
 )
@@ -19,16 +18,10 @@ var showCmd = &cobra.Command{
 	Long:  "List the machines recorded in local state, or with --origin the machines AWS reports right now.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := u.LoadConfig()
-		if err != nil {
-			u.PrintFatal("Failed to load the sharingan configuration", err)
-		}
-		clients, err := awsx.New(cmd.Context(), cfg.Profile, cfg.Region)
-		if err != nil {
-			u.PrintFatal(fmt.Sprintf("Failed to reach AWS with profile %s in %s", cfg.Profile, cfg.Region), err)
-		}
+		clients := activeClients(cmd.Context())
 
 		var machines []inventory.Machine
+		var err error
 		if showFlags.origin {
 			u.PrintRunning(fmt.Sprintf("Querying %s", clients.Region))
 			machines, err = inventory.FromAPI(cmd.Context(), clients)

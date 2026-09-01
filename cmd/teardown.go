@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/tanq16/sharingan/internal/awsx"
 	"github.com/tanq16/sharingan/internal/scaffold"
 	u "github.com/tanq16/sharingan/utils"
 )
@@ -17,14 +16,7 @@ var teardownCmd = &cobra.Command{
 	Long:  "Delete the VPC, subnet, internet gateway, route table, security group, and key pair. Refuses while managed instances exist.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := u.LoadConfig()
-		if err != nil {
-			u.PrintFatal("Failed to load the sharingan configuration", err)
-		}
-		clients, err := awsx.New(cmd.Context(), cfg.Profile, cfg.Region)
-		if err != nil {
-			u.PrintFatal(fmt.Sprintf("Failed to reach AWS with profile %s in %s", cfg.Profile, cfg.Region), err)
-		}
+		clients := activeClients(cmd.Context())
 
 		u.PrintRunning(fmt.Sprintf("(Running) Tearing down account %s in %s", clients.Account, clients.Region))
 		var lines int
@@ -33,7 +25,7 @@ var teardownCmd = &cobra.Command{
 			lines++
 		}}
 
-		err = scaffold.Teardown(cmd.Context(), scfg, clients)
+		err := scaffold.Teardown(cmd.Context(), scfg, clients)
 		u.ClearLines(lines + 1)
 
 		if blocked, ok := errors.AsType[*scaffold.InstancesExistError](err); ok {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tanq16/sharingan/internal/awsx"
 	"github.com/tanq16/sharingan/internal/scaffold"
 	u "github.com/tanq16/sharingan/utils"
 )
@@ -15,14 +14,7 @@ var setupCmd = &cobra.Command{
 	Long:  "Create the VPC, subnet, internet gateway, route table, security group, and key pair that machines launch into. Safe to re-run.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := u.LoadConfig()
-		if err != nil {
-			u.PrintFatal("Failed to load the sharingan configuration", err)
-		}
-		clients, err := awsx.New(cmd.Context(), cfg.Profile, cfg.Region)
-		if err != nil {
-			u.PrintFatal(fmt.Sprintf("Failed to reach AWS with profile %s in %s", cfg.Profile, cfg.Region), err)
-		}
+		clients := activeClients(cmd.Context())
 
 		u.PrintRunning(fmt.Sprintf("(Running) Scaffolding account %s in %s", clients.Account, clients.Region))
 		var lines, created int
@@ -34,7 +26,7 @@ var setupCmd = &cobra.Command{
 			}
 		}}
 
-		err = scaffold.Setup(cmd.Context(), scfg, clients)
+		err := scaffold.Setup(cmd.Context(), scfg, clients)
 		u.ClearLines(lines + 1)
 		if err != nil {
 			u.PrintFatal(fmt.Sprintf("Setup failed in %s", clients.Region), err)

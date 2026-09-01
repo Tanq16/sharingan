@@ -31,7 +31,7 @@ var createCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		ctx := cmd.Context()
-		clients := machineClients(ctx)
+		clients := activeClients(ctx)
 		resolver := machineResolver(ctx, clients)
 
 		target := resolveShape(resolver, "create", string(createFlags.arch), string(createFlags.shape), string(createFlags.class))
@@ -56,18 +56,6 @@ var createCmd = &cobra.Command{
 			created.InstanceType, created.Arch, created.VCPU, created.MemoryGB, created.DiskGB))
 		u.PrintInfo(fmt.Sprintf("bootstrap is still running, follow it with `sharingan status %s`", name))
 	},
-}
-
-func machineClients(ctx context.Context) *awsx.Clients {
-	cfg, err := u.LoadConfig()
-	if err != nil {
-		u.PrintFatal("Failed to read the sharingan configuration", err)
-	}
-	clients, err := awsx.New(ctx, cfg.Profile, cfg.Region)
-	if err != nil {
-		u.PrintFatal(fmt.Sprintf("Failed to reach AWS as %s in %s", cfg.Profile, cfg.Region), err)
-	}
-	return clients
 }
 
 func machineResolver(ctx context.Context, clients *awsx.Clients) *sizing.Resolver {

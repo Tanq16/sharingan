@@ -15,10 +15,14 @@ var setConfigFlags struct {
 
 var setConfigCmd = &cobra.Command{
 	Use:   "set-config",
-	Short: "Set the active AWS profile and region",
-	Long:  "Set the active AWS profile and region. Anything not given as a flag is chosen interactively.",
+	Short: "Register an AWS profile and region, and make it active",
+	Long:  "Register an AWS profile and region, and make it active. Anything not given as a flag is chosen interactively.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := u.LoadConfig()
+		if err != nil {
+			u.PrintFatal("Failed to read the sharingan configuration", err)
+		}
 		profile := setConfigFlags.profile
 		if profile == "" {
 			profile = promptProfile()
@@ -28,7 +32,7 @@ var setConfigCmd = &cobra.Command{
 			region = promptRegion()
 		}
 
-		cfg := &u.Config{Profile: profile, Region: region}
+		cfg.Register(profile, region)
 		if err := cfg.Save(); err != nil {
 			u.PrintFatal(fmt.Sprintf("Failed to write %s", u.ConfigPath()), err)
 		}

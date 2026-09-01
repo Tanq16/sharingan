@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/tanq16/sharingan/internal/awsx"
 	"github.com/tanq16/sharingan/internal/pricing"
 	"github.com/tanq16/sharingan/internal/sizing"
 	u "github.com/tanq16/sharingan/utils"
@@ -18,14 +17,7 @@ var costsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 
-		cfg, err := u.LoadConfig()
-		if err != nil {
-			u.PrintFatal("Failed to load the sharingan configuration", err)
-		}
-		clients, err := awsx.New(ctx, cfg.Profile, cfg.Region)
-		if err != nil {
-			u.PrintFatal(fmt.Sprintf("Failed to reach AWS with profile %s in %s", cfg.Profile, cfg.Region), err)
-		}
+		clients := activeClients(ctx)
 
 		u.PrintRunning("fetching on-demand prices")
 		prices, err := pricing.Fetch(ctx, clients)
@@ -51,7 +43,7 @@ var costsCmd = &cobra.Command{
 
 		runningHeaders := append([]string{"Shape", "Class", "Type", "Compute/hr"}, diskHeaders...)
 		for _, arch := range []string{sizing.ArchX86, sizing.ArchARM} {
-			u.PrintInfo(fmt.Sprintf("Monthly cost while running on %s in %s, by root volume size", arch, cfg.Region))
+			u.PrintInfo(fmt.Sprintf("Monthly cost while running on %s in %s, by root volume size", arch, clients.Region))
 			u.PrintTable(runningHeaders, runningRows(resolver, prices, arch, disks))
 		}
 		u.PrintInfo("Monthly cost while stopped, root volume only")
